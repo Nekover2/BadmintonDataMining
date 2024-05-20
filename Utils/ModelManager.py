@@ -191,6 +191,8 @@ class ModelManager:
             if(len(corner) > 3) :
                 start_corner_coordinate = corner
                 break
+        if(len(start_corner_coordinate) == 0):
+            raise Exception("Cannot detect any court corner from video, abort!")
         distanceCalculator = DistanceCalculator(start_corner_coordinate)
         last_coords =[]
         for i in self.playerCoordinates:
@@ -201,6 +203,9 @@ class ModelManager:
             player_spd = []
             if(len(self.playerCoordinates[i]) < 3) :
                 self.player_speeds.append(player_spd)
+                continue
+            if(len(self.playerCoordinates[i]) < 2):
+                self.player_speeds.append(self.player_speeds[i-1])
                 continue
             for j in range(0,2):
                 curr_coords = self.playerCoordinates[i][j]

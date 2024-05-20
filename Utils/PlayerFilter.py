@@ -34,12 +34,9 @@ def filter_players_by_corner(playerCoords, courtCoords, highest_jump = 30 ):
         if corner[0] < min_x : min_x = corner[0]
         if corner[1] < min_y : min_y = corner[1]
     filteredPlayers = []
-    print(min_x, max_x, min_y, max_y)
     for player_coordinate in playerCoords:
-        print(player_coordinate[2], player_coordinate[3])
         #maybe if the player is jumping, we should consider the highest jump
         if(min_x <= player_coordinate[2] <= max_x):
             if(min_y - highest_jump <= player_coordinate[3] <= max_y + highest_jump):
                 filteredPlayers.append(player_coordinate)
-    print(filteredPlayers)
     return filteredPlayers
