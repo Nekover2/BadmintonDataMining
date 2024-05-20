@@ -1,6 +1,23 @@
 import cv2
 import os
 
+def read_video_attributes(video_path):
+    if not os.path.isfile(video_path):
+        print(f"Error: The file '{video_path}' does not exist")
+        exit()
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Error: Could not open video file")
+        exit()
+
+    # Get the frame width, height, and frames per second
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    cap.release()
+    return width, height, fps
 
 def read_video(video_path):
     if not os.path.isfile(video_path):

@@ -3,13 +3,14 @@ from Models.ModelTracker import ModelTracker
 from Models.CornerDetector import CornerDetector
 from Utils.PlayerFilter import filter_players_by_corner
 from Utils.DistanceCalculator import DistanceCalculator
+from Utils.VideoProcessor import read_video_attributes, read_video, save_video
 import threading
 import time
 import os
 import cv2
 
 class ModelManager:
-    def __init__(self, player_model_path='', court_model_path = '', shuttlecock_model_path = '', highest_jump = 30, save_predictions = False, save_dir = 'predicted', interval =1/30):
+    def __init__(self, player_model_path='', court_model_path = '', shuttlecock_model_path = '', highest_jump = 30, save_predictions = False, save_dir = 'predicted'):
         self.player_model_path = player_model_path
         self.court_model_path = court_model_path
         self.shuttlecock_model_path = shuttlecock_model_path
@@ -23,7 +24,7 @@ class ModelManager:
         self.highest_jump = highest_jump
         self.save_predictions = save_predictions
         self.save_dir = save_dir
-        self.interval = interval
+        self.interval = 1/30
         self.player_speeds=[]
     def load_models(self):
         if not os.path.exists(self.save_dir):
@@ -37,7 +38,12 @@ class ModelManager:
             
         if os.path.exists(self.shuttlecock_model_path):
             self.shuttlecock_tracker = ModelTracker(model_path=self.shuttlecock_model_path) 
-        
+    
+    def load_video(self, video_path):
+        #load video
+        self.width, self.height, self.fps = read_video_attributes(video_path)
+        self.frames = read_video(video_path)
+        self.interval = 1/self.fps
         
     def get_player_tracker(self):
         return self.player_tracker
@@ -60,54 +66,89 @@ class ModelManager:
     def get_corner_coordinates(self):
         return self.cornerCoordinates
     
-    def track_player(self, frames):
+    def track_player(self):
         results = []
         
-        for frame in frames:
+        for frame in self.frames:
             results.append(self.player_tracker.track_frame(frame))
-
         self.playerCoordinates = results
         
         
-    def track_court_and_corner(self, frames):
+        
+        
+    def track_court_and_corner(self):
         courtCoordinates = []
         cornerCoordinates = []
         
-        for frame in frames:
-            courtCoordiate = self.court_tracker.predict_frame(frame)
+        for i in range(len(self.frames)) :
+            courtCoordinates.append([])
+            cornerCoordinates.append([])
+        #recalculate court and corner coordinates each 1 second and fill previous uncalculated frames with empty list
+        frame_per_step = (int) (self.fps)
+        for i in range(0, len(self.frames), frame_per_step):
+            courtCoordiate = self.court_tracker.predict_frame(self.frames[i])
             if(len(courtCoordiate) > 0):
-                courtCoordinates.append(courtCoordiate[0])
+                courtCoordinates[i] = courtCoordiate[0]
                 x1, y1, x2, y2 = courtCoordiate[0]
-                court_image = frame[int(y1):int(y2), int(x1):int(x2)]
+                court_image = self.frames[i][int(y1):int(y2), int(x1):int(x2)]
                 corner_detector = CornerDetector(court_image)
-                cornerCoordinates.append(corner_detector.convert_coordiante_size([courtCoordiate[0]]))
-            else:
-                courtCoordinates.append([])
-                cornerCoordinates.append([])
-
+                cornerCoordinates[i] = corner_detector.convert_coordiante_size([courtCoordiate[0]])
+        
         self.courtCoordinates = courtCoordinates
         self.cornerCoordinates = cornerCoordinates
+        current_court_coordinates = []
+        current_corner_coordinates = []
+        for i in range(0, len(self.frames), frame_per_step):
+            if(len(self.cornerCoordinates[i]) != 0):
+                current_court_coordinates = self.courtCoordinates[i]
+                current_corner_coordinates = self.cornerCoordinates[i]
+                
+        for i in range(len(self.frames)) :
+            if( len(self.cornerCoordinates[i]) !=0):
+                current_court_coordinates = self.courtCoordinates[i]
+                current_corner_coordinates = self.cornerCoordinates[i]
+            self.courtCoordinates[i] = current_court_coordinates
+            self.cornerCoordinates[i] = current_corner_coordinates
+            
+        if(len(current_corner_coordinates) == 0):
+            raise Exception("Cannot detect any court corner from video, abort!")
+        # for frame in self.frames:
+        #     courtCoordiate = self.court_tracker.predict_frame(frame)
+        #     if(len(courtCoordiate) > 0):
+        #         courtCoordinates.append(courtCoordiate[0])
+        #         x1, y1, x2, y2 = courtCoordiate[0]
+        #         court_image = frame[int(y1):int(y2), int(x1):int(x2)]
+        #         corner_detector = CornerDetector(court_image)
+        #         cornerCoordinates.append(corner_detector.convert_coordiante_size([courtCoordiate[0]]))
+        #     else:
+        #         courtCoordinates.append([])
+        #         cornerCoordinates.append([])
+
+        # self.courtCoordinates = courtCoordinates
+        # self.cornerCoordinates = cornerCoordinates
         
-    def track_shuttlecock(self, frames):
+    def track_shuttlecock(self):
         results = []
         
-        for frame in frames:
+        for frame in self.frames:
             results.append(self.shuttlecock_tracker.predict_frame(frame))
 
         self.shuttlecockCoordinates = results
-    def start(self, frames):
+        
+        
+    def start(self):
         #use multithreading to load models
         thread1 = None
         thread2 = None
         thread3 = None
         if(self.player_tracker is not None):
-            thread1 = threading.Thread(target=self.track_player, args=(frames,))
+            thread1 = threading.Thread(target=self.track_player, args=())
             thread1.start()
         if(self.court_tracker is not None):
-            thread2 = threading.Thread(target=self.track_court_and_corner, args=(frames,))
+            thread2 = threading.Thread(target=self.track_court_and_corner, args=())
             thread2.start()
         if(self.shuttlecock_tracker is not None):
-            thread3 = threading.Thread(target=self.track_shuttlecock, args=(frames,))
+            thread3 = threading.Thread(target=self.track_shuttlecock, args=())
             thread3.start()
         
         if(thread1 is not None):
@@ -117,18 +158,17 @@ class ModelManager:
         if(thread3 is not None):
             thread3.join()
         
-    def draw_boxes(self, frames) :
+    def draw_boxes(self) :
         final_frames = []
         
             
-        for i in range(len(frames)):
-            frame = frames[i]
+        for i in range(len(self.frames)):
+            frame = self.frames[i]
             player_coordinates = self.playerCoordinates[i]
             player_coordinates = filter_players_by_corner(player_coordinates, self.cornerCoordinates[i])
             court_coordinates = self.courtCoordinates[i]
             # shuttlecock_coordinates = self.shuttlecockCoordinates[i]
-            corner_coordinates = self.cornerCoordinates[i]
-            print('court_coordinates:', court_coordinates)
+            self.playerCoordinates[i] = player_coordinates
             
             if len(court_coordinates) > 0:
                 frame = self.court_tracker.draw_boxes(frame, [court_coordinates])
@@ -139,10 +179,10 @@ class ModelManager:
             #     frame = self.shuttlecock_tracker.draw_boxes(frame, shuttlecock_coordinates)
             
             final_frames.append(frame)
-            
+        self.boxed_frames = final_frames
         return final_frames
     
-    def calculate_player_speeds(self, frames) :
+    def calculate_player_speeds(self) :
         # Calculate player speed
         self.player_speeds.append([])
         start_corner_coordinate =  []
@@ -157,7 +197,7 @@ class ModelManager:
             if(len(i) > 1):
                 last_coords = i
                 break
-        for i in range(1, len(frames)) :
+        for i in range(1, len(self.frames)) :
             player_spd = []
             if(len(self.playerCoordinates[i]) < 3) :
                 self.player_speeds.append(player_spd)
@@ -182,17 +222,18 @@ class ModelManager:
                 self.player_speeds[i][j] = round(self.player_speeds[i][j], 2)
         return self.player_speeds
 
-    def show_calculate_player_speeds(self, frames) :
+    def show_calculate_player_speeds(self) :
         # show player speed at the bottom left corner of the frame
         final_frames = []
-        self.calculate_player_speeds(frames)
-        for i in range(0, len(frames)) :
-            frame = frames[i]
+        self.calculate_player_speeds()
+        for i in range(0, len(self.frames)) :
+            frame = self.frames[i]
             if(len(self.player_speeds[i]) ==0) :
                 final_frames.append(frame)
                 continue
-            frame = self.display_player_speeds(frame, self.player_speeds[i][0], self.player_speeds[i][1])
+            frame = self.display_player_speeds(frame,self.player_speeds[i][0], self.player_speeds[i][1])
             final_frames.append(frame)
+        self.final_frames = final_frames
         return final_frames
     
     

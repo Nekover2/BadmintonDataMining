@@ -1,49 +1,65 @@
-from Models.ModelTracker import ModelTracker
-from Models.CornerDetector import CornerDetector
-from Utils.VideoProcessor import read_video, save_video
-from Utils.PlayerFilter import filter_players, filter_players_by_corner
-import os
+import tkinter as tk
+from tkinter import filedialog
 import cv2
+import PIL.ImageTk as ImageTk
+from PIL import Image
 
-def main():
-    #read image 
-    image = cv2.imread('image.png')
-    # Read video
-    input_video_path = 'video.mp4'
-    video_frames = read_video(input_video_path)
-    
-    player_tracker = ModelTracker(model_path='yolov8s.pt')
-    court_tracker = ModelTracker(model_path='PretrainedModel/court.pt')
-    shuttlecock_tracker = ModelTracker(model_path='PretrainedModel/best.pt')
-    # for frame in video_frames:
-    court_coordinates = court_tracker.predict_frame(image)[0]
-    people_coordinates = player_tracker.track_frame([image])
-    
-    # Cut the court from the image
-    x1, y1, x2, y2 = court_coordinates
-    court_image = image[int(y1):int(y2), int(x1):int(x2)]
+# Function to handle the 'Process' button click event
+def process_button_click():
+    video_path = filedialog.askopenfilename(filetypes=[('Video Files', '*.mp4;*.avi')])
+    if video_path:
+        process_video(video_path)
 
-    # Detect the corners of the court
-    corner_detector = CornerDetector(court_image)
-    corner_coordinates = corner_detector.convert_coordiante_size([court_coordinates])
-    # We will take the first 4 corners as the court corners
-    #cv2.imwrite('court.png', court_image)
-    image = court_tracker.draw_boxes(image, [court_coordinates])
-    
-    
-    frames = corner_detector.draw_key_points_on_videos([image], [court_coordinates])
-    
-    cv2.imwrite('output1.png', frames[0])
-    
-    true_player_coordinates = filter_players_by_corner(people_coordinates, corner_coordinates)
-    # filter out the player coordinates that are within the court, then draw the bounding boxes
-    print(corner_coordinates)
-    print(true_player_coordinates)
-            
-    image = player_tracker.draw_boxes(image, true_player_coordinates)
-    #save image
-    cv2.imwrite('output.png', image)
+# Create the main window
+window = tk.Tk()
+window.title("Video Processing")
+window.geometry("400x300")
+
+# Create a label to display instructions
+instructions_label = tk.Label(window, text="Please select a video file:")
+instructions_label.pack(pady=10)
+
+# Create a 'Process' button
+process_button = tk.Button(window, text="Process", command=process_button_click)
+process_button.pack(pady=10)
 
 
-if __name__ == "__main__":
-    main()
+# windows after choosing the file
+# Clear all widgets from the window
+    
+# Create a label to display status
+status_label = tk.Label(window, text="")
+status_label.pack(pady=10)
+
+# Function to update the status label
+def update_status(status):
+    status_label.config(text=status)
+    window.update_idletasks()
+    
+# Function to process the video (replace with your own processing code)
+
+def process_video(video_path):
+    
+    for widget in window.winfo_children():
+        widget.destroy()
+    # Process the video using your code
+    # Replace this with your actual processing logic
+    cap = cv2.VideoCapture(video_path)
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        # Perform processing on the frame
+        processed_frame = frame  # Placeholder, replace with your own processing logic
+        # Display the processed frame
+        cv2.imshow('Processed Video', processed_frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cap.release()
+    cv2.destroyAllWindows()
+    
+    window.destroy()
+
+
+# Start the Tkinter event loop
+window.mainloop()
