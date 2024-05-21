@@ -1,0 +1,5 @@
+{
+    "databaseUri" : "mongodb://localhost:27017/mean",
+    "databaseName" : "BadmintonDataminer",
+    "collectionName" : "BadmintonData"
+}

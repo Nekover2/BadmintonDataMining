@@ -1,4 +1,3 @@
-# Ứng dụng các mô hình học máy vào trong môn thể thao cầu lông
 # Badminton Data Mining
 
 This project applies machine learning models to the sport of badminton.
