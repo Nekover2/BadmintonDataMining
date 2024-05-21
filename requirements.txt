@@ -1,0 +1,8 @@
+moviepy==1.0.3
+numpy==1.26.4
+opencv_python==4.9.0.80
+Pillow==9.0.1
+Pillow==10.3.0
+pymongo==4.7.2
+Requests==2.32.1
+ultralytics==8.2.15

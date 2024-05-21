@@ -9,6 +9,8 @@ import os
 
 from Utils.ModelManager import ModelManager
 from Utils import VideoProcessor
+from Utils.DataManager import DataManager
+
 # ============== Global Variables ==============
 input_path_global = None
 output_path_global = None
@@ -77,15 +79,60 @@ def handle_file_selection():
         progress_info.update()
         progress_bar["value"] = 100
         
-        VideoProcessor.save_video(model_manager.final_frames, 'output.mp4')
+        VideoProcessor.save_video(model_manager.final_frames, 'output.avi')
         
-        messagebox.showinfo("Success", "Video processed and saved to 'output.mp4'")
+        messagebox.showinfo("Success", "Video processed and saved to 'output.avi'")
+
+        #ask the user if they want to save the processed video to database
+        save_to_database = messagebox.askyesno("Save to Database", "Do you want to save the processed video to the database?")
+        if save_to_database:
+            
+            #clear the progress bar
+            progress_bar.destroy()
+            progress_info.destroy()
+            header.config(text="Uploading input video to file storage...")
+            header.update()
+            #upload the input and output files to pixeldrain
+            input_file_link = DataManager.upload_needed_files(input_path_global)
+            
+            header.config(text="Uploading output video to file storage...")
+            header.update()
+            output_file_link = DataManager.upload_needed_files('output.mp4')
+            #store the links to the database
+            header.config(text="Storing videos and player average speed to the database...")
+            header.update()
+            #read the json config file
+            
+            db_config = DataManager.read_json_file('config.json')
+            data_manager = DataManager(db_config['databaseUri'], db_config['databaseName'])
+            player1_avg_speed = 0
+            player2_avg_speed = 0
+            
+            for i in range(len(player_spds)):
+                if(len(player_spds[i]) < 2):
+                    continue
+                player1_avg_speed += player_spds[i][0]
+                player2_avg_speed += player_spds[i][1]
+            player1_avg_speed /= len(player_spds)
+            player2_avg_speed /= len(player_spds)
+            data_manager.store_to_database({'input_file_link': input_file_link, 'output_file_link': output_file_link, 'player1_spd': player1_avg_speed, 'player2_spd': player2_avg_speed}, db_config['collectionName'])
+            messagebox.showinfo("Success", "Video saved to the database")
+        # Ask the user if they want to play the video
+        play_video = messagebox.askyesno("Play Video", "Do you want to play the processed video?")
+        if not play_video:
+            # destroy all widgets
+            for widget in root.winfo_children():
+                widget.destroy()
+            root.quit()
+            return
         
+
+
         # Play the video using the default media player
         if os.name == 'nt':  # Windows
-            os.startfile('output.mp4')
+            os.startfile('output.avi')
         elif os.name == 'posix':  # macOS or Linux
-            os.system(f'open "output.mp4"' if sys.platform == 'darwin' else f'xdg-open "output.mp4"')
+            os.system(f'open "output.avi"' if sys.platform == 'darwin' else f'xdg-open "output.avi"')
             
         # destroy all widgets
         for widget in root.winfo_children():
